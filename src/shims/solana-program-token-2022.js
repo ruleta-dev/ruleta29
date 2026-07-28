@@ -1,5 +1,9 @@
 import { address } from "@solana/kit";
 
+export const TOKEN_2022_PROGRAM_ADDRESS = address(
+  "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+);
+
 export const TOKEN_PROGRAM_ADDRESS = address(
   "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
 );
@@ -11,7 +15,7 @@ export const ASSOCIATED_TOKEN_PROGRAM_ADDRESS = address(
 function notAvailable(name) {
   return function () {
     throw new Error(
-      `@solana-program/token is not available (stub). ${name}() called. This app does not use SPL token instructions.`,
+      `@solana-program/token-2022 is not available (stub). ${name}() called. This app does not use SPL token-2022 instructions.`,
     );
   };
 }
@@ -31,30 +35,24 @@ export const getInitializeAccountInstruction = notAvailable(
 );
 export const getMintToInstruction = notAvailable("getMintToInstruction");
 export const getBurnInstruction = notAvailable("getBurnInstruction");
-export const getCreateMintInstruction = notAvailable(
-  "getCreateMintInstruction",
-);
-export const getCreateTokenInstruction = notAvailable(
-  "getCreateTokenInstruction",
-);
 export const getCloseAccountInstruction = notAvailable(
   "getCloseAccountInstruction",
 );
 
 export async function fetchMint() {
   throw new Error(
-    "@solana-program/token is not available (stub). fetchMint() called. This app does not use SPL token instructions.",
+    "@solana-program/token-2022 is not available (stub). fetchMint() called. This app does not use SPL token-2022 instructions.",
   );
 }
 
 export async function fetchToken() {
   throw new Error(
-    "@solana-program/token is not available (stub). fetchToken() called.",
+    "@solana-program/token-2022 is not available (stub). fetchToken() called.",
   );
 }
 
 export function findAssociatedTokenPda() {
   throw new Error(
-    "@solana-program/token is not available (stub). findAssociatedTokenPda() called.",
+    "@solana-program/token-2022 is not available (stub). findAssociatedTokenPda() called.",
   );
 }

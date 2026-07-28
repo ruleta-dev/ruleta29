@@ -9,6 +9,9 @@ export default defineConfig({
       "@solana-program/token": fileURLToPath(
         new URL("./src/shims/solana-program-token.js", import.meta.url),
       ),
+      "@solana-program/token-2022": fileURLToPath(
+        new URL("./src/shims/solana-program-token-2022.js", import.meta.url),
+      ),
       "@solana-program/memo": fileURLToPath(
         new URL("./src/shims/solana-program-memo.js", import.meta.url),
       ),
