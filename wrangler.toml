@@ -4,4 +4,4 @@ compatibility_date = "2026-07-28"
 [vars]
 ENVIRONMENT = "production"
 
-pages_build_output_dir = "dist"
+assets = { directory = "dist" }
