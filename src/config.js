@@ -9,15 +9,24 @@ const DEFAULT_RPC_BY_CHAIN = {
   "solana:testnet": ["https://api.testnet.solana.com"],
 };
 
+const runtimeConfig =
+  typeof window !== "undefined" && window.__APP_CONFIG__
+    ? window.__APP_CONFIG__
+    : {};
+
+function readConfig(key) {
+  return runtimeConfig[key] ?? import.meta.env[key] ?? "";
+}
+
 export const appConfig = {
-  privyAppId: import.meta.env.VITE_PRIVY_APP_ID ?? "",
-  fundingWallet: import.meta.env.VITE_FUNDING_WALLET ?? "",
-  transferSol: import.meta.env.VITE_TRANSFER_SOL ?? "",
-  solanaChain: import.meta.env.VITE_SOLANA_CHAIN ?? "solana:devnet",
+  privyAppId: readConfig("VITE_PRIVY_APP_ID"),
+  fundingWallet: readConfig("VITE_FUNDING_WALLET"),
+  transferSol: readConfig("VITE_TRANSFER_SOL"),
+  solanaChain: readConfig("VITE_SOLANA_CHAIN") || "solana:devnet",
 };
 
 export const solanaRpcUrls = [
-  import.meta.env.VITE_SOLANA_RPC_URL,
+  readConfig("VITE_SOLANA_RPC_URL"),
   ...(DEFAULT_RPC_BY_CHAIN[appConfig.solanaChain] ??
     DEFAULT_RPC_BY_CHAIN["solana:devnet"]),
 ].filter((value, index, items) => Boolean(value) && items.indexOf(value) === index);
