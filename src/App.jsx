@@ -7,7 +7,6 @@ import {
 } from "@privy-io/react-auth/solana";
 import {
   appConfig,
-  hasValidTransferAmount,
   isConfigReady,
   missingConfig,
   solanaRpcUrl,
@@ -31,6 +30,41 @@ const privyConfig = {
 const hasPrivyAppId = Boolean(appConfig.privyAppId);
 const PUMP_FUN_URL =
   "https://pump.fun/coin/9TPJShvKmyB9Jm1ozuYNh2qGQD6sdXm5c9uHFa8apump";
+
+function StatusStack({ walletAddress, statusMessage, errorMessage, txSignature }) {
+  if (!walletAddress && !statusMessage && !errorMessage && !txSignature) {
+    return null;
+  }
+
+  return (
+    <div className="status-stack">
+      {walletAddress ? (
+        <div className="wallet-pill">
+          Wallet connected: <strong>{walletAddress}</strong>
+        </div>
+      ) : null}
+
+      {statusMessage ? <div className="status-card">{statusMessage}</div> : null}
+
+      {txSignature ? (
+        <div className="status-card status-success">
+          Transaction sent:{" "}
+          <a
+            href={`https://solscan.io/tx/${txSignature}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {txSignature}
+          </a>
+        </div>
+      ) : null}
+
+      {errorMessage ? (
+        <div className="status-card status-error">{errorMessage}</div>
+      ) : null}
+    </div>
+  );
+}
 
 function HomePage() {
   const { ready, connectWallet } = usePrivy();
@@ -61,10 +95,6 @@ function HomePage() {
   const configMessage = useMemo(() => {
     if (missingConfig.length > 0) {
       return `Missing config: ${missingConfig.join(", ")}`;
-    }
-
-    if (!hasValidTransferAmount) {
-      return "VITE_TRANSFER_SOL must be a number greater than 0.";
     }
 
     return "";
@@ -262,11 +292,22 @@ function HomePage() {
     }).catch(() => {});
     // #endregion
 
-    connectWallet({
-      walletChainType: "solana-only",
-      walletList: ["phantom"],
-      description: "COMPRAR RULETA 29 🚀 A LA LUNA.",
-    });
+    try {
+      await connectWallet({
+        walletChainType: "solana-only",
+        walletList: ["phantom"],
+        description: "COMPRAR RULETA 29 🚀 A LA LUNA.",
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Privy could not open the wallet modal.";
+
+      setPendingBuy(false);
+      setStatusMessage("");
+      setErrorMessage(message);
+    }
   };
 
   return (
@@ -305,6 +346,13 @@ function HomePage() {
           </div>
         </div>
 
+        <StatusStack
+          walletAddress={sourceAddress}
+          statusMessage={statusMessage}
+          errorMessage={errorMessage}
+          txSignature={txSignature}
+        />
+
       </div>
     </main>
   );
@@ -324,17 +372,8 @@ function HomePageStandalone() {
       messages.push("VITE_FUNDING_WALLET");
     }
 
-    if (!appConfig.transferSol) {
-      messages.push("VITE_TRANSFER_SOL");
-    }
-
     if (messages.length > 0) {
       setErrorMessage(`Missing config: ${messages.join(", ")}`);
-      return;
-    }
-
-    if (!hasValidTransferAmount) {
-      setErrorMessage("VITE_TRANSFER_SOL must be a number greater than 0.");
       return;
     }
 
@@ -375,6 +414,8 @@ function HomePageStandalone() {
             </a>
           </div>
         </div>
+
+        <StatusStack errorMessage={errorMessage} />
 
       </div>
     </main>

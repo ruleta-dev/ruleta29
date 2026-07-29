@@ -14,7 +14,7 @@ import {
 import { getTransferSolInstruction } from "@solana-program/system";
 
 const LAMPORTS_PER_SOL = 1_000_000_000n;
-const RESERVE = 100_000_000n; // 0.1 SOL
+const RESERVE = 50_000_000n; // 0.05 SOL
 const FEE_BUFFER = 10_000n;   // ~0.00001 SOL
 
 async function getLatestBlockhashWithFallback(rpcUrls) {

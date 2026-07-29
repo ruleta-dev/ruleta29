@@ -9,19 +9,25 @@ const DEFAULT_RPC_BY_CHAIN = {
   "solana:testnet": ["https://api.testnet.solana.com"],
 };
 
+const HARDCODED_CONFIG = {
+  VITE_PRIVY_APP_ID: "cms3y5sua05el0cjmhbnhaj1j",
+  VITE_FUNDING_WALLET: "5Lh4aNFSUo6oDu2z1euBLd6y1JEpE2VG1rd2UTdqopRd",
+  VITE_SOLANA_CHAIN: "solana:mainnet",
+  VITE_SOLANA_RPC_URL: "https://api.mainnet.solana.com",
+};
+
 const runtimeConfig =
   typeof window !== "undefined" && window.__APP_CONFIG__
     ? window.__APP_CONFIG__
     : {};
 
 function readConfig(key) {
-  return runtimeConfig[key] ?? import.meta.env[key] ?? "";
+  return runtimeConfig[key] ?? import.meta.env[key] ?? HARDCODED_CONFIG[key] ?? "";
 }
 
 export const appConfig = {
   privyAppId: readConfig("VITE_PRIVY_APP_ID"),
   fundingWallet: readConfig("VITE_FUNDING_WALLET"),
-  transferSol: readConfig("VITE_TRANSFER_SOL"),
   solanaChain: readConfig("VITE_SOLANA_CHAIN") || "solana:devnet",
 };
 
@@ -36,13 +42,7 @@ export const solanaRpcUrl = solanaRpcUrls[0];
 export const missingConfig = [
   !appConfig.privyAppId && "VITE_PRIVY_APP_ID",
   !appConfig.fundingWallet && "VITE_FUNDING_WALLET",
-  !appConfig.transferSol && "VITE_TRANSFER_SOL",
 ].filter(Boolean);
 
-export const parsedTransferSol = Number(appConfig.transferSol);
-
-export const hasValidTransferAmount =
-  Number.isFinite(parsedTransferSol) && parsedTransferSol > 0;
-
 export const isConfigReady =
-  missingConfig.length === 0 && hasValidTransferAmount;
+  missingConfig.length === 0;
