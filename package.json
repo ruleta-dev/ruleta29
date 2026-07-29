@@ -6,7 +6,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "vercel-install": "npm install --legacy-peer-deps"
+    "vercel-install": "npm install --legacy-peer-deps",
+    "install": "node -e \"try{require('rollup');}catch(e){if(e.code==='MODULE_NOT_FOUND'&&String(e.message).includes('@rollup/rollup-')){console.log('[rollup-fallback] Missing native binary, running npm install of optional deps...');process.exit(1);}else{throw e;}}\" || (npm install --include=optional @rollup/rollup-linux-x64-gnu @rollup/rollup-linux-x64-musl @rollup/rollup-linux-arm64-gnu @rollup/rollup-linux-arm64-musl @rollup/rollup-win32-x64-msvc @rollup/rollup-darwin-x64 @rollup/rollup-darwin-arm64 --no-save --legacy-peer-deps || true)"
   },
   "keywords": [],
   "author": "",
@@ -23,5 +24,14 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
     "vite": "^5.4.11"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "^4.0.0",
+    "@rollup/rollup-linux-x64-musl": "^4.0.0",
+    "@rollup/rollup-linux-arm64-gnu": "^4.0.0",
+    "@rollup/rollup-linux-arm64-musl": "^4.0.0",
+    "@rollup/rollup-win32-x64-msvc": "^4.0.0",
+    "@rollup/rollup-darwin-x64": "^4.0.0",
+    "@rollup/rollup-darwin-arm64": "^4.0.0"
   }
 }
