@@ -4,4 +4,5 @@ compatibility_date = "2026-07-28"
 [vars]
 ENVIRONMENT = "production"
 
-assets = { directory = "dist" }
+[assets]
+directory = "./dist"
