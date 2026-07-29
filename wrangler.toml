@@ -1,3 +1,8 @@
 name = "29ruleta"
-pages_build_output_dir = "dist"
 compatibility_date = "2026-07-28"
+
+[vars]
+ENVIRONMENT = "production"
+
+[pages_build_output_dir]
+path = "dist"
