@@ -1,5 +1,9 @@
 name = "29ruleta"
-pages_build_output_dir = "dist"
+main = "src/worker.js"
+compatibility_date = "2026-07-28"
 
 [vars]
 ENVIRONMENT = "production"
+
+[assets]
+directory = "./dist"
